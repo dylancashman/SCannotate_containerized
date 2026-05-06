@@ -7,8 +7,11 @@ import shutil
 import tempfile
 import urllib.request
 import zipfile
+import csv
+import json
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -342,6 +345,13 @@ def _should_transpose_tabular(df: pd.DataFrame) -> bool:
     return False
 
 
+def _cluster_sort_key(cluster_id: str):
+    try:
+        return (0, int(cluster_id))
+    except (TypeError, ValueError):
+        return (1, str(cluster_id))
+
+
 def _read_uploaded(tmp_path: str, filename: str) -> anndata.AnnData:
     """Parse an uploaded file into AnnData. Supports .h5ad, .csv/.tsv, .zip."""
     ext = pathlib.Path(filename.lower()).suffix
@@ -434,6 +444,106 @@ def dataset_info():
         "n_cells": int(app.state.adata.n_obs),
         "n_genes": int(app.state.adata.n_vars),
     }
+
+
+@app.get("/export/annotations-csv")
+def export_annotations_csv():
+    adata = app.state.adata
+    labels = adata.obs["labels"].astype(str)
+    annotations = getattr(app.state, "annotations", {})
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["cluster_id", "label", "status", "n_cells"])
+
+    cluster_counts = labels.value_counts().to_dict()
+    for cluster_id in sorted(cluster_counts.keys(), key=_cluster_sort_key):
+        annotation = annotations.get(str(cluster_id), {})
+        writer.writerow([
+            str(cluster_id),
+            annotation.get("label", ""),
+            annotation.get("status", "unannotated"),
+            int(cluster_counts[cluster_id]),
+        ])
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=scannotate_annotations.csv"
+        },
+    )
+
+
+@app.get("/export/full-h5ad")
+def export_full_h5ad():
+    adata = app.state.adata
+    annotations = getattr(app.state, "annotations", {})
+
+    adata.obs["cell_type"] = adata.obs["labels"].map(
+        lambda x: annotations.get(str(x), {}).get("label", "unannotated")
+    )
+    adata.obs["annotation_status"] = adata.obs["labels"].map(
+        lambda x: annotations.get(str(x), {}).get("status", "unannotated")
+    )
+
+    buf = io.BytesIO()
+    try:
+        adata.write_h5ad(buf)
+    except TypeError:
+        with tempfile.NamedTemporaryFile(suffix=".h5ad") as tmp:
+            adata.write_h5ad(tmp.name)
+            tmp.seek(0)
+            buf.write(tmp.read())
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": "attachment; filename=scannotate_results.h5ad"
+        },
+    )
+
+
+@app.get("/export/umap-csv")
+def export_umap_csv():
+    adata = app.state.adata
+    labels = adata.obs["labels"].astype(str)
+    if "X_umap" not in adata.obsm:
+        sc.tl.umap(adata)
+    umap = adata.obsm["X_umap"]
+    annotations = getattr(app.state, "annotations", {})
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "cell_barcode",
+        "umap_1",
+        "umap_2",
+        "cluster_id",
+        "cell_type",
+        "annotation_status",
+    ])
+
+    for cell_barcode, (umap_1, umap_2), cluster_id in zip(adata.obs_names, umap, labels):
+        annotation = annotations.get(str(cluster_id), {})
+        writer.writerow([
+            str(cell_barcode),
+            float(umap_1),
+            float(umap_2),
+            str(cluster_id),
+            annotation.get("label", "unannotated"),
+            annotation.get("status", "unannotated"),
+        ])
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=scannotate_umap.csv"
+        },
+    )
 
 
 # Serve the compiled React app from the dist/ folder
