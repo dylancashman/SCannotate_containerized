@@ -65,6 +65,26 @@ Then open [http://localhost:8000](http://localhost:8000). The server preprocesse
 
 The `--reload` flag is optional; omit it in production.
 
+## Running with Docker
+
+The recommended way to run SCannotate in production is via Docker. The image builds the React frontend and serves it alongside the FastAPI backend in a single container.
+
+**Requirements:** Docker and Docker Compose. Allocate at least **4 GB** of memory to the container — LightGBM and SHAP analysis can be memory-intensive.
+
+```bash
+docker compose up --build
+```
+
+Then open [http://localhost:8000](http://localhost:8000). The first startup preprocesses the PBMC 3k dataset and downloads the PanglaoDB marker reference — allow **30–60 seconds** before the app is ready.
+
+Session state (cluster annotations, uploaded datasets) is stored in memory and is **lost when the container restarts**.
+
+To stop the container:
+
+```bash
+docker compose down
+```
+
 ## Modifying the Frontend
 
 If you change any file under `frontend/src/`, you need to rebuild and re-bundle before the backend serves the updated UI:
