@@ -408,11 +408,11 @@ const App: React.FC = () => {
   // Mount: data fetches + onboarding check
   useEffect(() => {
     fetchCluster(resolution, algorithm, minClusterSize, minSamples);
-    fetch('http://localhost:8000/annotations')
+    fetch('/annotations')
       .then(r => r.json())
       .then(d => setAnnotations(d.annotations ?? {}))
       .catch(() => {});
-    fetch('http://localhost:8000/dataset-info')
+    fetch('/dataset-info')
       .then(r => r.json())
       .then(d => {
         setDatasetName(d.dataset === 'pbmc3k' ? 'PBMC 3k (built-in)' : d.dataset);
@@ -459,7 +459,7 @@ const App: React.FC = () => {
     setSelectedCluster(null);
     setSuggestions([]);
     try {
-      const response = await fetch('http://localhost:8000/cluster', {
+      const response = await fetch('/cluster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -490,7 +490,7 @@ const App: React.FC = () => {
     setSelectedCluster(clusterId);
     setSuggestionsLoading(true);
     try {
-      const resp = await fetch('http://localhost:8000/annotate', {
+      const resp = await fetch('/annotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_id: clusterId }),
@@ -512,7 +512,7 @@ const App: React.FC = () => {
       [selectedCluster]: { label: cellType, status: 'confirmed' },
     }));
     try {
-      await fetch('http://localhost:8000/annotations/save', {
+      await fetch('/annotations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_id: selectedCluster, label: cellType, status: 'confirmed' }),
@@ -531,7 +531,7 @@ const App: React.FC = () => {
     }));
     setAnnotationInput('');
     try {
-      await fetch('http://localhost:8000/annotations/save', {
+      await fetch('/annotations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_id: selectedCluster, label, status: 'confirmed' }),
@@ -544,7 +544,7 @@ const App: React.FC = () => {
   const fetchShap = async () => {
     setShapLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/shap', { method: 'POST' });
+      const response = await fetch('/shap', { method: 'POST' });
       const result = await response.json();
       setShapData(result.clusters);
       setShapStale(false);
@@ -616,7 +616,7 @@ const App: React.FC = () => {
     setImportLoading(true);
     setImportError(null);
     try {
-      const resp = await fetch('http://localhost:8000/load-dataset', {
+      const resp = await fetch('/load-dataset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset: selectedBuiltin }),
@@ -646,7 +646,7 @@ const App: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
-      const resp = await fetch('http://localhost:8000/upload-dataset', {
+      const resp = await fetch('/upload-dataset', {
         method: 'POST',
         body: formData,
       });

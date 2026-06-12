@@ -13,6 +13,7 @@ dependencies:
   - numpy
   - scipy
   - pandas
+  - hdbscan
   - pip
   - pip:
     - fastapi==0.109.0

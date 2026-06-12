@@ -1,0 +1,14 @@
+.git
+.gitignore
+**/__pycache__
+**/*.py[cod]
+.venv
+env/
+venv/
+node_modules/
+frontend/dist/
+backend/dist/
+simple_function/
+.cursor/
+*.md
+!README.md
