@@ -11,6 +11,15 @@ type Annotations = Record<string, { label: string; status: string }>;
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
+// Hardcoded to this app's known mount path behind the router's reverse proxy
+// (see infra/ARCHITECTURE.md) -- root-absolute fetch('/cluster') etc. resolve
+// against the browser's document origin, not this page's own
+// /app/scannotate/ subpath, so they hit the router's own Caddy instead of
+// this app's backend. Note this is separate from vite.config.ts's `base`
+// setting, which only affects built asset (JS/CSS) URLs, not these runtime
+// fetch calls.
+const API_BASE = '/app/scannotate';
+
 const PLOTLY_COLORS = [
   '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
   '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52',
@@ -408,11 +417,11 @@ const App: React.FC = () => {
   // Mount: data fetches + onboarding check
   useEffect(() => {
     fetchCluster(resolution, algorithm, minClusterSize, minSamples);
-    fetch('/annotations')
+    fetch(`${API_BASE}/annotations`)
       .then(r => r.json())
       .then(d => setAnnotations(d.annotations ?? {}))
       .catch(() => {});
-    fetch('/dataset-info')
+    fetch(`${API_BASE}/dataset-info`)
       .then(r => r.json())
       .then(d => {
         setDatasetName(d.dataset === 'pbmc3k' ? 'PBMC 3k (built-in)' : d.dataset);
@@ -459,7 +468,7 @@ const App: React.FC = () => {
     setSelectedCluster(null);
     setSuggestions([]);
     try {
-      const response = await fetch('/cluster', {
+      const response = await fetch(`${API_BASE}/cluster`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -490,7 +499,7 @@ const App: React.FC = () => {
     setSelectedCluster(clusterId);
     setSuggestionsLoading(true);
     try {
-      const resp = await fetch('/annotate', {
+      const resp = await fetch(`${API_BASE}/annotate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_id: clusterId }),
@@ -512,7 +521,7 @@ const App: React.FC = () => {
       [selectedCluster]: { label: cellType, status: 'confirmed' },
     }));
     try {
-      await fetch('/annotations/save', {
+      await fetch(`${API_BASE}/annotations/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cluster_id: selectedCluster, label: cellType, status: 'confirmed' }),
@@ -544,7 +553,7 @@ const App: React.FC = () => {
   const fetchShap = async () => {
     setShapLoading(true);
     try {
-      const response = await fetch('/shap', { method: 'POST' });
+      const response = await fetch(`${API_BASE}/shap`, { method: 'POST' });
       const result = await response.json();
       setShapData(result.clusters);
       setShapStale(false);
@@ -616,7 +625,7 @@ const App: React.FC = () => {
     setImportLoading(true);
     setImportError(null);
     try {
-      const resp = await fetch('/load-dataset', {
+      const resp = await fetch(`${API_BASE}/load-dataset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset: selectedBuiltin }),
@@ -646,7 +655,7 @@ const App: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
-      const resp = await fetch('/upload-dataset', {
+      const resp = await fetch(`${API_BASE}/upload-dataset`, {
         method: 'POST',
         body: formData,
       });
